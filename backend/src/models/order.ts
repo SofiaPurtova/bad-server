@@ -4,6 +4,7 @@ import validator from 'validator'
 import { PaymentType, phoneRegExp } from '../middlewares/validations'
 import Counter from './counter'
 import User from './user'
+import xss from 'xss'
 
 export enum StatusType {
     Cancelled = 'cancelled',
