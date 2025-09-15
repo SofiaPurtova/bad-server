@@ -18,70 +18,73 @@ import routes from './routes'
 const { PORT = 3000 } = process.env
 const app = express()
 
-app.use(cookieParser());
-// CSRF protection
-const csrfProtection = csurf({ cookie: true });
-app.use(csrfProtection);
-
+// 1. Базовые middleware
 app.use(cors());
-
 app.use(helmet());
+app.use(cookieParser());
 
-// Rate limiting
+// 2. Парсинг тела запроса ДО CSRF
+app.use(urlencoded({ extended: true }))
+app.use(json())
+
+// 3. Rate limiting
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  windowMs: 15 * 60 * 1000,
+  max: 100,
   message: 'Too many requests from this IP',
   standardHeaders: true,
   legacyHeaders: false,
 });
 app.use('/api/', limiter);
 
-// Более строгий лимит для auth endpoints
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 5, // 5 attempts
+  max: 5,
   message: 'Too many login attempts',
 });
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
 
-// XSS protection middleware - ИСПРАВЛЕННАЯ ВЕРСИЯ
-//app.use((req: Request, res: Response, next: NextFunction) => {
-//  if (req.body) {
-//    Object.keys(req.body).forEach((key) => {
-//      if (typeof req.body[key] === 'string') {
-//        req.body[key] = xss(req.body[key]);
-//      }
-//    });
-//  }
-//  next();
-//});
+// 4. CSRF protection - ПОСЛЕ парсинга тела и кук
+const csrfProtection = csurf({ 
+  cookie: true,
+  // Исключаем API endpoints из CSRF проверки
+  ignoreMethods: ['GET', 'HEAD', 'OPTIONS']
+});
 
-// Добавим CSRF token endpoint
+// Применяем CSRF только к определенным routes
+app.use('/api', (req: Request, res: Response, next: NextFunction) => {
+  // Исключаем auth endpoints и CSRF token endpoint из проверки
+  if (
+    req.path.startsWith('/auth/') ||
+    req.path === '/csrf-token' ||
+    req.method === 'GET'
+  ) {
+    return next();
+  }
+  return csrfProtection(req, res, next);
+});
+
+// 5. CSRF token endpoint
 app.get('/api/csrf-token', (req: Request, res: Response) => {
   res.json({ csrfToken: req.csrfToken() });
 });
 
-// app.use(cors({ origin: ORIGIN_ALLOW, credentials: true }));
-// app.use(express.static(path.join(__dirname, 'public')));
-
+// 6. Static files
 app.use(serveStatic(path.join(__dirname, 'public')))
 
-app.use(urlencoded({ extended: true }))
-app.use(json())
-
-app.options('*', cors())
+// 7. Routes
 app.use(routes)
+
+// 8. Error handling
 app.use(errors())
 app.use(errorHandler)
 
-// eslint-disable-next-line no-console
-
+// 9. Bootstrap
 const bootstrap = async () => {
     try {
         await mongoose.connect(DB_ADDRESS)
-        await app.listen(PORT, () => console.log('ok'))
+        await app.listen(PORT, () => console.log('Server started on port', PORT))
     } catch (error) {
         console.error(error)
     }
