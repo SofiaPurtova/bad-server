@@ -19,7 +19,11 @@ const { PORT = 3000 } = process.env
 const app = express()
 
 // 1. Базовые middleware
-app.use(cors());
+app.use(cors({
+  origin: process.env.ORIGIN_ALLOW || 'http://localhost:3000',
+  credentials: true,
+  allowedHeaders: ['Content-Type', 'X-CSRF-Token', 'Authorization']
+}));
 app.use(helmet());
 app.use(cookieParser());
 

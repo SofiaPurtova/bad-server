@@ -63,6 +63,7 @@ const orderSchema: Schema = new Schema(
                 validator: (v: string) => phoneRegExp.test(v),
                 message: 'Поле "phone" должно быть валидным телефоном.',
             },
+            set: (v: string) => xss(v.trim())
         },
         comment: {
             type: String,

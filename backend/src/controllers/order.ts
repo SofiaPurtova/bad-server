@@ -109,7 +109,7 @@ export const getOrders = async (
 
         // Безопасный поиск
         if (search && typeof search === 'string') {
-            const safeSearch = sanitizeSearch(search)
+            const safeSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             const searchRegex = new RegExp(safeSearch, 'i')
             const searchNumber = Number(safeSearch)
 
@@ -178,7 +178,9 @@ export const getOrdersCurrentUser = async (
 ) => {
     try {
         const userId = res.locals.user._id
-        const { search, page = 1, limit = 5 } = req.query
+        const { search } = req.query
+        const page = Math.max(1, parseInt(req.query.page as string) || 1);
+const limit = Math.min(10, Math.max(1, parseInt(req.query.limit as string) || 10));
         const options = {
             skip: (Number(page) - 1) * Number(limit),
             limit: Number(limit),
