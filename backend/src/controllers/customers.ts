@@ -1,13 +1,27 @@
 import { NextFunction, Request, Response } from 'express'
-import { FilterQuery } from 'mongoose'
+import { FilterQuery, Types } from 'mongoose'
 import validator from 'validator'
 import NotFoundError from '../errors/not-found-error'
 import Order from '../models/order'
 import User, { IUser } from '../models/user'
+import xss from 'xss'
 
-// TODO: Добавить guard admin
-// eslint-disable-next-line max-len
-// Get GET /customers?page=2&limit=5&sort=totalAmount&order=desc&registrationDateFrom=2023-01-01&registrationDateTo=2023-12-31&lastOrderDateFrom=2023-01-01&lastOrderDateTo=2023-12-31&totalAmountFrom=100&totalAmountTo=1000&orderCountFrom=1&orderCountTo=10
+// Функция для санитизации пользователя
+const sanitizeUser = (user: any) => {
+  const userObj = user.toObject ? user.toObject() : user
+  return {
+    ...userObj,
+    name: xss(userObj.name),
+    email: xss(userObj.email),
+    phone: userObj.phone ? xss(userObj.phone) : undefined
+  }
+}
+
+const sanitizeSearch = (input: string): string => {
+  return input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+// GET /customers
 export const getCustomers = async (
     req: Request,
     res: Response,
@@ -32,15 +46,16 @@ export const getCustomers = async (
 
         const filters: FilterQuery<Partial<IUser>> = {}
 
-        if (registrationDateFrom) {
+        // Безопасная фильтрация дат
+        if (registrationDateFrom && typeof registrationDateFrom === 'string') {
             filters.createdAt = {
                 ...filters.createdAt,
-                $gte: new Date(registrationDateFrom as string),
+                $gte: new Date(registrationDateFrom),
             }
         }
 
-        if (registrationDateTo) {
-            const endOfDay = new Date(registrationDateTo as string)
+        if (registrationDateTo && typeof registrationDateTo === 'string') {
+            const endOfDay = new Date(registrationDateTo)
             endOfDay.setHours(23, 59, 59, 999)
             filters.createdAt = {
                 ...filters.createdAt,
@@ -48,15 +63,15 @@ export const getCustomers = async (
             }
         }
 
-        if (lastOrderDateFrom) {
+        if (lastOrderDateFrom && typeof lastOrderDateFrom === 'string') {
             filters.lastOrderDate = {
                 ...filters.lastOrderDate,
-                $gte: new Date(lastOrderDateFrom as string),
+                $gte: new Date(lastOrderDateFrom),
             }
         }
 
-        if (lastOrderDateTo) {
-            const endOfDay = new Date(lastOrderDateTo as string)
+        if (lastOrderDateTo && typeof lastOrderDateTo === 'string') {
+            const endOfDay = new Date(lastOrderDateTo)
             endOfDay.setHours(23, 59, 59, 999)
             filters.lastOrderDate = {
                 ...filters.lastOrderDate,
@@ -64,6 +79,7 @@ export const getCustomers = async (
             }
         }
 
+        // Безопасная фильтрация чисел
         if (totalAmountFrom) {
             filters.totalAmount = {
                 ...filters.totalAmount,
@@ -92,9 +108,10 @@ export const getCustomers = async (
             }
         }
 
-        if (search) {
-            const safeSearch = validator.escape(search as string);
-            const searchRegex = new RegExp(safeSearch, 'i');
+        // Безопасный поиск
+        if (search && typeof search === 'string') {
+            const safeSearch = sanitizeSearch(search)
+            const searchRegex = new RegExp(safeSearch, 'i')
             const orders = await Order.find(
                 {
                     $or: [{ deliveryAddress: searchRegex }],
@@ -113,7 +130,8 @@ export const getCustomers = async (
         const sort: { [key: string]: any } = {}
 
         if (sortField && sortOrder) {
-            sort[sortField as string] = sortOrder === 'desc' ? -1 : 1
+            const safeSortField = xss(sortField as string)
+            sort[safeSortField] = sortOrder === 'desc' ? -1 : 1
         }
 
         const options = {
@@ -141,8 +159,11 @@ export const getCustomers = async (
         const totalUsers = await User.countDocuments(filters)
         const totalPages = Math.ceil(totalUsers / Number(limit))
 
+        // XSS защита при отправке
+        const sanitizedUsers = users.map(sanitizeUser)
+
         res.status(200).json({
-            customers: users,
+            customers: sanitizedUsers,
             pagination: {
                 totalUsers,
                 totalPages,
@@ -155,7 +176,6 @@ export const getCustomers = async (
     }
 }
 
-// TODO: Добавить guard admin
 // Get /customers/:id
 export const getCustomerById = async (
     req: Request,
@@ -163,17 +183,29 @@ export const getCustomerById = async (
     next: NextFunction
 ) => {
     try {
-        const user = await User.findById(req.params.id).populate([
+        const { id } = req.params
+        
+        // Валидация ID
+        if (!Types.ObjectId.isValid(id)) {
+            return next(new NotFoundError('Невалидный ID пользователя'))
+        }
+
+        const user = await User.findById(id).populate([
             'orders',
             'lastOrder',
         ])
-        res.status(200).json(user)
+        
+        if (!user) {
+            return next(new NotFoundError('Пользователь не найден'))
+        }
+        
+        // XSS защита при отправке
+        res.status(200).json(sanitizeUser(user))
     } catch (error) {
         next(error)
     }
 }
 
-// TODO: Добавить guard admin
 // Patch /customers/:id
 export const updateCustomer = async (
     req: Request,
@@ -181,9 +213,22 @@ export const updateCustomer = async (
     next: NextFunction
 ) => {
     try {
+        const { id } = req.params
+        
+        // Валидация ID
+        if (!Types.ObjectId.isValid(id)) {
+            return next(new NotFoundError('Невалидный ID пользователя'))
+        }
+
+        // XSS защита обновляемых данных
+        const updates: any = {}
+        if (req.body.name) updates.name = xss(req.body.name.trim())
+        if (req.body.phone) updates.phone = xss(req.body.phone.trim())
+        if (req.body.email) updates.email = xss(req.body.email.trim())
+
         const updatedUser = await User.findByIdAndUpdate(
-            req.params.id,
-            req.body,
+            id,
+            updates,
             {
                 new: true,
             }
@@ -195,13 +240,14 @@ export const updateCustomer = async (
                     )
             )
             .populate(['orders', 'lastOrder'])
-        res.status(200).json(updatedUser)
+        
+        // XSS защита при отправке
+        res.status(200).json(sanitizeUser(updatedUser))
     } catch (error) {
         next(error)
     }
 }
 
-// TODO: Добавить guard admin
 // Delete /customers/:id
 export const deleteCustomer = async (
     req: Request,
@@ -209,13 +255,22 @@ export const deleteCustomer = async (
     next: NextFunction
 ) => {
     try {
-        const deletedUser = await User.findByIdAndDelete(req.params.id).orFail(
+        const { id } = req.params
+        
+        // Валидация ID
+        if (!Types.ObjectId.isValid(id)) {
+            return next(new NotFoundError('Невалидный ID пользователя'))
+        }
+
+        const deletedUser = await User.findByIdAndDelete(id).orFail(
             () =>
                 new NotFoundError(
                     'Пользователь по заданному id отсутствует в базе'
                 )
         )
-        res.status(200).json(deletedUser)
+        
+        // XSS защита при отправке
+        res.status(200).json(sanitizeUser(deletedUser))
     } catch (error) {
         next(error)
     }

@@ -9,22 +9,40 @@ import ConflictError from '../errors/conflict-error'
 import NotFoundError from '../errors/not-found-error'
 import UnauthorizedError from '../errors/unauthorized-error'
 import User from '../models/user'
+import xss from 'xss'
+
+// Функция для санитизации пользователя
+const sanitizeUser = (user: any) => {
+  const userObj = user.toObject ? user.toObject() : user
+  return {
+    ...userObj,
+    name: xss(userObj.name),
+    email: xss(userObj.email),
+    phone: userObj.phone ? xss(userObj.phone) : undefined
+  }
+}
 
 // POST /auth/login
 const login = async (req: Request, res: Response, next: NextFunction) => {
     try {
+        // XSS защита входных данных
         const { email, password } = req.body
-        const user = await User.findUserByCredentials(email, password)
+        const sanitizedEmail = xss(email.trim())
+
+        const user = await User.findUserByCredentials(sanitizedEmail, password)
         const accessToken = user.generateAccessToken()
         const refreshToken = await user.generateRefreshToken()
+        
         res.cookie(
             REFRESH_TOKEN.cookie.name,
             refreshToken,
             REFRESH_TOKEN.cookie.options
         )
+        
+        // XSS защита при отправке
         return res.json({
             success: true,
-            user,
+            user: sanitizeUser(user),
             accessToken,
         })
     } catch (err) {
@@ -35,8 +53,16 @@ const login = async (req: Request, res: Response, next: NextFunction) => {
 // POST /auth/register
 const register = async (req: Request, res: Response, next: NextFunction) => {
     try {
+        // XSS защита входных данных
         const { email, password, name } = req.body
-        const newUser = new User({ email, password, name })
+        const sanitizedEmail = xss(email.trim())
+        const sanitizedName = name ? xss(name.trim()) : 'Евлампий'
+
+        const newUser = new User({ 
+            email: sanitizedEmail, 
+            password, 
+            name: sanitizedName 
+        })
         await newUser.save()
         const accessToken = newUser.generateAccessToken()
         const refreshToken = await newUser.generateRefreshToken()
@@ -46,9 +72,11 @@ const register = async (req: Request, res: Response, next: NextFunction) => {
             refreshToken,
             REFRESH_TOKEN.cookie.options
         )
+        
+        // XSS защита при отправке
         return res.status(constants.HTTP_STATUS_CREATED).json({
             success: true,
-            user: newUser,
+            user: sanitizeUser(newUser),
             accessToken,
         })
     } catch (error) {
@@ -78,13 +106,14 @@ const getCurrentUser = async (
                     'Пользователь по заданному id отсутствует в базе'
                 )
         )
-        res.json({ user, success: true })
+        
+        // XSS защита при отправке
+        res.json({ user: sanitizeUser(user), success: true })
     } catch (error) {
         next(error)
     }
 }
 
-// Можно лучше: вынести общую логику получения данных из refresh токена
 const deleteRefreshTokenInUser = async (
     req: Request,
     _res: Response,
@@ -101,6 +130,7 @@ const deleteRefreshTokenInUser = async (
         rfTkn,
         REFRESH_TOKEN.secret
     ) as JwtPayload
+    
     const user = await User.findOne({
         _id: decodedRefreshTkn._id,
     }).orFail(() => new UnauthorizedError('Пользователь не найден в базе'))
@@ -117,7 +147,6 @@ const deleteRefreshTokenInUser = async (
     return user
 }
 
-// Реализация удаления токена из базы может отличаться
 // GET  /auth/logout
 const logout = async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -149,14 +178,17 @@ const refreshAccessToken = async (
         )
         const accessToken = await userWithRefreshTkn.generateAccessToken()
         const refreshToken = await userWithRefreshTkn.generateRefreshToken()
+        
         res.cookie(
             REFRESH_TOKEN.cookie.name,
             refreshToken,
             REFRESH_TOKEN.cookie.options
         )
+        
+        // XSS защита при отправке
         return res.json({
             success: true,
-            user: userWithRefreshTkn,
+            user: sanitizeUser(userWithRefreshTkn),
             accessToken,
         })
     } catch (error) {
@@ -192,7 +224,13 @@ const updateCurrentUser = async (
 ) => {
     const userId = res.locals.user._id
     try {
-        const updatedUser = await User.findByIdAndUpdate(userId, req.body, {
+        // XSS защита обновляемых данных
+        const updates: any = {}
+        if (req.body.name) updates.name = xss(req.body.name.trim())
+        if (req.body.phone) updates.phone = xss(req.body.phone.trim())
+        if (req.body.email) updates.email = xss(req.body.email.trim())
+
+        const updatedUser = await User.findByIdAndUpdate(userId, updates, {
             new: true,
         }).orFail(
             () =>
@@ -200,7 +238,9 @@ const updateCurrentUser = async (
                     'Пользователь по заданному id отсутствует в базе'
                 )
         )
-        res.status(200).json(updatedUser)
+        
+        // XSS защита при отправке
+        res.status(200).json(sanitizeUser(updatedUser))
     } catch (error) {
         next(error)
     }

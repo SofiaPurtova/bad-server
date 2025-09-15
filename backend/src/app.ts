@@ -18,39 +18,51 @@ import routes from './routes'
 const { PORT = 3000 } = process.env
 const app = express()
 
-app.use(cookieParser())
+app.use(cookieParser());
+// CSRF protection
+const csrfProtection = csurf({ cookie: true });
+app.use(csrfProtection);
+
+app.use(cors());
+
 app.use(helmet());
 
 // Rate limiting
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: 'Too many requests from this IP'
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: 'Too many requests from this IP',
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 app.use('/api/', limiter);
 
-// CSRF protection
-const csrfProtection = csurf({ cookie: true });
-app.use('/api/*', csrfProtection);
+// Более строгий лимит для auth endpoints
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5, // 5 attempts
+  message: 'Too many login attempts',
+});
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
 
 // XSS protection middleware - ИСПРАВЛЕННАЯ ВЕРСИЯ
-app.use((req: Request, res: Response, next: NextFunction) => {
-  if (req.body) {
-    Object.keys(req.body).forEach((key) => {
-      if (typeof req.body[key] === 'string') {
-        req.body[key] = xss(req.body[key]);
-      }
-    });
-  }
-  next();
-});
+//app.use((req: Request, res: Response, next: NextFunction) => {
+//  if (req.body) {
+//    Object.keys(req.body).forEach((key) => {
+//      if (typeof req.body[key] === 'string') {
+//        req.body[key] = xss(req.body[key]);
+//      }
+//    });
+//  }
+//  next();
+//});
 
 // Добавим CSRF token endpoint
 app.get('/api/csrf-token', (req: Request, res: Response) => {
   res.json({ csrfToken: req.csrfToken() });
 });
 
-app.use(cors())
 // app.use(cors({ origin: ORIGIN_ALLOW, credentials: true }));
 // app.use(express.static(path.join(__dirname, 'public')));
 

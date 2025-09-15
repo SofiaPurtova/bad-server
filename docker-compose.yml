@@ -16,7 +16,7 @@ services:
     volumes:
       - db:/data/db
     ports:
-      - 21017:21017
+      - 27017:27017
     networks:
       - internal
 
