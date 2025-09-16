@@ -123,28 +123,39 @@ const deleteRefreshTokenInUser = async (
     const rfTkn = cookies[REFRESH_TOKEN.cookie.name]
 
     if (!rfTkn) {
-        throw new UnauthorizedError('Не валидный токен')
+        throw new UnauthorizedError('Refresh token не предоставлен')
     }
 
-    const decodedRefreshTkn = jwt.verify(
-        rfTkn,
-        REFRESH_TOKEN.secret
-    ) as JwtPayload
-    
-    const user = await User.findOne({
-        _id: decodedRefreshTkn._id,
-    }).orFail(() => new UnauthorizedError('Пользователь не найден в базе'))
+    try {
+        // Верифицируем токен
+        const decodedRefreshTkn = jwt.verify(
+            rfTkn,
+            REFRESH_TOKEN.secret
+        ) as JwtPayload
+        
+        const user = await User.findOne({
+            _id: decodedRefreshTkn._id,
+        }).orFail(() => new UnauthorizedError('Пользователь не найден в базе'))
 
-    const rTknHash = crypto
-        .createHmac('sha256', REFRESH_TOKEN.secret)
-        .update(rfTkn)
-        .digest('hex')
+        const rTknHash = crypto
+            .createHmac('sha256', REFRESH_TOKEN.secret)
+            .update(rfTkn)
+            .digest('hex')
 
-    user.tokens = user.tokens.filter((tokenObj) => tokenObj.token !== rTknHash)
+        user.tokens = user.tokens.filter((tokenObj) => tokenObj.token !== rTknHash)
 
-    await user.save()
+        await user.save()
 
-    return user
+        return user
+    } catch (error) {
+        if (error instanceof jwt.JsonWebTokenError) {
+            throw new UnauthorizedError('Не валидный токен')
+        }
+        if (error instanceof jwt.TokenExpiredError) {
+            throw new UnauthorizedError('Токен истек')
+        }
+        throw error
+    }
 }
 
 // GET  /auth/logout

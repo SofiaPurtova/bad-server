@@ -20,9 +20,9 @@ const app = express()
 
 // 1. Базовые middleware
 app.use(cors({
-  origin: process.env.ORIGIN_ALLOW || 'http://localhost:3000',
+  origin: ['http://localhost', 'http://localhost:5173'],
   credentials: true,
-  allowedHeaders: ['Content-Type', 'X-CSRF-Token', 'Authorization']
+  //allowedHeaders: ['Content-Type', 'X-CSRF-Token', 'Authorization']
 }));
 app.use(helmet());
 app.use(cookieParser());
