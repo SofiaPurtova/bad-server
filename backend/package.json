@@ -4,6 +4,7 @@
   "description": "< Добавьте описание проекта в свободной форме >",
   "main": "dist/app.js",
   "scripts": {
+    "init-users": "ts-node src/initUsers.ts",
     "lint": "npx eslint src/**/*.ts",
     "format": "prettier ./src --write",
     "build": "tsc",
