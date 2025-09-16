@@ -31,9 +31,9 @@ export const getOrders = async (
     next: NextFunction
 ) => {
     try {
+        const page = Math.max(1, parseInt(req.query.page as string) || 1);
+        const limit = Math.min(10, Math.max(1, parseInt(req.query.limit as string) || 10));
         const {
-            page = 1,
-            limit = 10,
             sortField = 'createdAt',
             sortOrder = 'desc',
             status,
