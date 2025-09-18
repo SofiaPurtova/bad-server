@@ -54,9 +54,8 @@ const userSchema = new mongoose.Schema<IUser, IUserModel, IUserMethods>(
         email: {
             type: String,
             required: [true, 'Поле "email" должно быть заполнено'],
-            unique: true, // поле email уникально (есть опция unique: true);
+            unique: true,
             validate: {
-                // для проверки email студенты используют validator
                 validator: (v: string) => validator.isEmail(v),
                 message: 'Поле "email" должно быть валидным email-адресом',
             },
@@ -181,15 +180,15 @@ userSchema.statics.findUserByCredentials = async function findByCredentials(
     const user = await this.findOne({ email })
         .select('+password')
         .orFail(() => new UnauthorizedError('Неправильные почта или пароль'))
+    console.log('Пользователь найден')
     const passwdMatch = await bcrypt.compare(password, user.password)
     if (!passwdMatch) {
-        throw new UnauthorizedError('Неправильные почта или пароль')
-    }
-    if (!passwdMatch) {
+        console.log('Пароль не совпал')
         return Promise.reject(
             new UnauthorizedError('Неправильные почта или пароль')
         )
     }
+    console.log('Пароль верный')
     return user
 }
 
