@@ -1,7 +1,11 @@
 import { Request, Express } from 'express'
 import multer, { FileFilterCallback } from 'multer'
 import path, { join } from 'path'
-import { v4 as uuidv4 } from 'uuid';
+//import { v4 as uuidv4 } from 'uuid';
+
+const generateSafeName = () => {
+    return Date.now() + '-' + Math.round(Math.random() * 1E9) + '-' + Math.round(Math.random() * 1E9);
+};
 
 type DestinationCallback = (error: Error | null, destination: string) => void
 type FileNameCallback = (error: Error | null, filename: string) => void
@@ -28,7 +32,7 @@ const storage = multer.diskStorage({
         file: Express.Multer.File,
         cb: FileNameCallback
     ) => {
-        const safeName = `${uuidv4()}${path.extname(file.originalname)}`;
+        const safeName = `${generateSafeName()}${path.extname(file.originalname)}`;
         cb(null, safeName);
     },
 })
