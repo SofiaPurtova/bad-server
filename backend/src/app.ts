@@ -9,7 +9,7 @@ import cors from 'cors'
 import 'dotenv/config'
 import express, { json, urlencoded, Request, Response, NextFunction } from 'express'
 import mongoose from 'mongoose'
-import ExpressMongoSanitize from 'express-mongo-sanitize'
+//import ExpressMongoSanitize from 'express-mongo-sanitize'
 import path from 'path'
 import { DB_ADDRESS } from './config'
 import errorHandler from './middlewares/error-handler'
@@ -32,7 +32,7 @@ app.use(limiter)
 // 1. Базовые middleware
 app.use(
     cors({
-        origin: ['http://localhost', 'http://localhost:5173'], // Разрешаем оба домена
+        origin: /*['http://localhost', 'http://localhost:5173'], // Разрешаем оба домена*/ true,
         credentials: true,
     })
 )
@@ -91,7 +91,7 @@ app.get('/api/csrf-token', (req: Request, res: Response) => {
 });*/
 
 app.options("*", cors())
-app.use(ExpressMongoSanitize())
+//app.use(ExpressMongoSanitize())
 
 // 7. Routes
 app.use(routes)
