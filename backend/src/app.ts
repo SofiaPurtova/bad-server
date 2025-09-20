@@ -20,7 +20,7 @@ const app = express()
 
 // 1. Базовые middleware
 app.use(cors({
-  origin: ['http://localhost', 'http://localhost:5173'],
+  origin: /*['http://localhost', 'http://localhost:5173']*/ true,
   credentials: true,
   //methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   //allowedHeaders: ['Content-Type', 'X-CSRF-Token']
@@ -40,16 +40,29 @@ const limiter = rateLimit({
   message: 'Too many requests from this IP',
   standardHeaders: true,
   legacyHeaders: false,
+  handler: (req, res) => {
+    res.status(429).json({
+      error: 'Слишком много запросов, попробуйте позже'
+    });
+  }
 });
-app.use('/api/', limiter);
+//app.use('/api/', limiter);
 
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 5,
-  message: 'Too many login attempts',
+  windowMs: 15 * 60 * 1000, // 15 минут
+  max: 5, // всего 5 попыток входа
+  message: 'Слишком много попыток входа',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    res.status(429).json({
+      error: 'Слишком много попыток входа, попробуйте позже'
+    });
+  }
 });
-app.use('/api/auth/login', authLimiter);
-app.use('/api/auth/register', authLimiter);
+
+//app.use('/api/auth/login', authLimiter);
+//app.use('/api/auth/register', authLimiter);
 
 /*// 4. CSRF protection - ПОСЛЕ парсинга тела и кук
 const csrfProtection = csurf({ 

@@ -10,7 +10,7 @@ import xss from 'xss'
 
 enum Role {
   Admin = 'admin',
-  User = 'user'
+  Customer = 'customer' // было User = 'user'
 }
 
 // Функции для санитизации
