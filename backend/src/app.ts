@@ -29,7 +29,6 @@ const limiter = rateLimit({
 })
 app.use(limiter)
 
-// 1. Базовые middleware
 app.use(
     cors({
         origin: /*['http://localhost', 'http://localhost:5173'], // Разрешаем оба домена*/ true,
@@ -37,31 +36,12 @@ app.use(
     })
 )
 
-app.use(helmet());
-
-
-
-// 2. Парсинг тела запроса ДО CSRF
 app.use(serveStatic(path.join(__dirname, 'public')))
 app.use(json({ limit: '10mb' }))
 app.use(urlencoded({ extended: true, limit: '10mb' }))
 
 
 //app.use('/api/', limiter);
-
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 минут
-  max: 5, // всего 5 попыток входа
-  message: 'Слишком много попыток входа',
-  standardHeaders: true,
-  legacyHeaders: false,
-  handler: (req, res) => {
-    res.status(429).json({
-      error: 'Слишком много попыток входа, попробуйте позже'
-    });
-  }
-});
-
 //app.use('/api/auth/login', authLimiter);
 //app.use('/api/auth/register', authLimiter);
 
