@@ -116,8 +116,8 @@ const getCurrentUser = async (
 
 const deleteRefreshTokenInUser = async (
     req: Request,
-    _res: Response,
-    _next: NextFunction
+    //_res: Response,
+    //_next: NextFunction
 ) => {
     const { cookies } = req
     const rfTkn = cookies[REFRESH_TOKEN.cookie.name]
@@ -161,7 +161,7 @@ const deleteRefreshTokenInUser = async (
 // GET  /auth/logout
 const logout = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        await deleteRefreshTokenInUser(req, res, next)
+        await deleteRefreshTokenInUser(req)
         const expireCookieOptions = {
             ...REFRESH_TOKEN.cookie.options,
             maxAge: -1,
@@ -182,11 +182,7 @@ const refreshAccessToken = async (
     next: NextFunction
 ) => {
     try {
-        const userWithRefreshTkn = await deleteRefreshTokenInUser(
-            req,
-            res,
-            next
-        )
+        const userWithRefreshTkn = await deleteRefreshTokenInUser(req)
         const accessToken = await userWithRefreshTkn.generateAccessToken()
         const refreshToken = await userWithRefreshTkn.generateRefreshToken()
         
@@ -256,6 +252,7 @@ const updateCurrentUser = async (
         next(error)
     }
 }
+
 
 export {
     getCurrentUser,

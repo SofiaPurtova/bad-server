@@ -27,6 +27,7 @@ app.use(cors({
 app.use(helmet());
 app.use(cookieParser());
 
+
 // 2. Парсинг тела запроса ДО CSRF
 app.use(urlencoded({ extended: true }))
 app.use(json())
@@ -49,7 +50,7 @@ const authLimiter = rateLimit({
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
 
-// 4. CSRF protection - ПОСЛЕ парсинга тела и кук
+/*// 4. CSRF protection - ПОСЛЕ парсинга тела и кук
 const csrfProtection = csurf({ 
   cookie: true,
   // Исключаем API endpoints из CSRF проверки
@@ -72,7 +73,7 @@ app.use('/api', (req: Request, res: Response, next: NextFunction) => {
 // 5. CSRF token endpoint
 app.get('/api/csrf-token', (req: Request, res: Response) => {
   res.json({ csrfToken: req.csrfToken() });
-});
+});*/
 
 // 6. Static files
 app.use(serveStatic(path.join(__dirname, 'public')))

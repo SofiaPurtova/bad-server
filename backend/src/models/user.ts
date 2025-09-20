@@ -133,14 +133,11 @@ userSchema.methods.generateAccessToken = function generateAccessToken() {
     const user = this
     // Создание accessToken токена возможно в контроллере авторизации
     return jwt.sign(
-        {
-            _id: user._id.toString(),
-            email: user.email,
-        },
+        {},
         ACCESS_TOKEN.secret,
         {
             expiresIn: ACCESS_TOKEN.expiry,
-            subject: user.id.toString(),
+            subject: user._id.toString(),
         }
     )
 }
