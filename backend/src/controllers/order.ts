@@ -31,17 +31,52 @@ const sanitizeSearch = (input: string): string => {
 // Новая функция для санитизации query параметров
 const sanitizeQueryParams = (query: any): any => {
   const sanitized: any = {};
+  
   for (const [key, value] of Object.entries(query)) {
     if (typeof value === 'string') {
+      // КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Защита от операторов $
+      if (value.startsWith('$')) {
+        throw new BadRequestError('Невалидный запрос');
+      }
       sanitized[key] = sanitizeSearch(value);
+    } else if (typeof value === 'object' && value !== null) {
+      // Рекурсивная санитизация для объектов (защита от { $ne: null } и т.д.)
+      sanitized[key] = sanitizeQueryParams(value);
     } else {
       sanitized[key] = value;
     }
   }
+  
   return sanitized;
-}
+};
 
-
+const sanitizeAggregationFilters = (filters: any): any => {
+  if (!filters || typeof filters !== 'object') return filters;
+  
+  const sanitized: any = {};
+  
+  for (const [key, value] of Object.entries(filters)) {
+    // Защита от операторов $ в ключах
+    if (key.startsWith('$')) {
+      throw new BadRequestError('Невалидный запрос');
+    }
+    
+    if (typeof value === 'string') {
+      // Защита от операторов $ в значениях
+      if (value.startsWith('$')) {
+        throw new BadRequestError('Невалидный запрос');
+      }
+      sanitized[key] = value;
+    } else if (typeof value === 'object' && value !== null) {
+      // Рекурсивная санитизация для вложенных объектов
+      sanitized[key] = sanitizeAggregationFilters(value);
+    } else {
+      sanitized[key] = value;
+    }
+  }
+  
+  return sanitized;
+};
 
 // GET /orders
 export const getOrders = async (
@@ -66,14 +101,21 @@ export const getOrders = async (
             orderDateTo,
         } = req.query
 
-        // Используем санитизированный search
-        const searchTerm = sanitizedQuery.search
+        // КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Санитизируем все query параметры
+        const safeQuery = sanitizeQueryParams(req.query);
+        
+        // Используем санитизированные значения
+        const searchTerm = safeQuery.search;
+        const safeStatus = safeQuery.status;
+        const safeTotalAmountFrom = safeQuery.totalAmountFrom;
+        const safeTotalAmountTo = safeQuery.totalAmountTo;
+        const safeOrderDateFrom = safeQuery.orderDateFrom;
+        const safeOrderDateTo = safeQuery.orderDateTo;
 
         const filters: FilterQuery<Partial<IOrder>> = {}
 
         // Безопасная фильтрация статуса
-        if (status && typeof status === 'string') {
-            const safeStatus = xss(status.trim())
+        if (safeStatus && typeof safeStatus === 'string') {
             const validStatuses = ['new', 'completed', 'cancelled', 'delivering']
             if (validStatuses.includes(safeStatus)) {
                 filters.status = safeStatus
@@ -81,37 +123,40 @@ export const getOrders = async (
         }
 
         // Безопасная фильтрация по сумме
-        if (totalAmountFrom) {
+        if (safeTotalAmountFrom) {
             filters.totalAmount = {
                 ...filters.totalAmount,
-                $gte: Number(totalAmountFrom),
+                $gte: Number(safeTotalAmountFrom),
             }
         }
 
-        if (totalAmountTo) {
+        if (safeTotalAmountTo) {
             filters.totalAmount = {
                 ...filters.totalAmount,
-                $lte: Number(totalAmountTo),
+                $lte: Number(safeTotalAmountTo),
             }
         }
 
         // Безопасная фильтрация по дате
-        if (orderDateFrom && typeof orderDateFrom === 'string') {
+        if (safeOrderDateFrom && typeof safeOrderDateFrom === 'string') {
             filters.createdAt = {
                 ...filters.createdAt,
-                $gte: new Date(orderDateFrom),
+                $gte: new Date(safeOrderDateFrom),
             }
         }
 
-        if (orderDateTo && typeof orderDateTo === 'string') {
+        if (safeOrderDateTo && typeof safeOrderDateTo === 'string') {
             filters.createdAt = {
                 ...filters.createdAt,
-                $lte: new Date(orderDateTo),
+                $lte: new Date(safeOrderDateTo),
             }
         }
+
+        // КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Санитизируем фильтры для агрегации
+        const safeFilters = sanitizeAggregationFilters(filters);
 
         const aggregatePipeline: any[] = [
-            { $match: filters },
+            { $match: safeFilters }, // Используем санитизированные фильтры
             {
                 $lookup: {
                     from: 'products',
@@ -203,10 +248,10 @@ export const getOrdersCurrentUser = async (
 ) => {
     try {
         const { limit, page, search, ...otherParams } = req.query;
-        const sanitizedQuery = sanitizeQueryParams({ limit, page, search })
+        const safeQuery = sanitizeQueryParams(req.query);
 
         const userId = res.locals.user._id
-        const searchTerm = sanitizedQuery.search;
+        const searchTerm = safeQuery.search;
 
         const pageNum = Math.max(1, parseInt(req.query.page as string) || 1);
         const limitNum = Math.min(10, Math.max(1, parseInt(req.query.limit as string) || 10));
