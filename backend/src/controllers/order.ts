@@ -8,6 +8,11 @@ import Product, { IProduct } from '../models/product'
 import User from '../models/user'
 import xss from 'xss'
 
+enum Role {
+  Admin = 'admin',
+  User = 'user'
+}
+
 // Функции для санитизации
 const sanitizeOrder = (order: any) => {
   const orderObj = order.toObject ? order.toObject() : order
@@ -85,6 +90,84 @@ export const getOrders = async (
     next: NextFunction
 ) => {
     try {
+        // КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Проверка прав доступа
+        const user = res.locals.user;
+        
+        // Если пользователь не админ, возвращаем ТОЛЬКО его заказы
+        if (!user.roles.includes(Role.Admin)) {
+            const pageNum = Math.max(1, parseInt(req.query.page as string) || 1);
+            const limitNum = Math.min(10, Math.max(1, parseInt(req.query.limit as string) || 10));
+            
+            // Санитизируем query параметры
+            const safeQuery = sanitizeQueryParams(req.query);
+            const searchTerm = safeQuery.search;
+            
+            // Базовые фильтры для пользователя
+            const userFilters: FilterQuery<Partial<IOrder>> = { customer: user._id };
+            
+            // Безопасный поиск для пользователя
+            if (searchTerm && typeof searchTerm === 'string') {
+                const safeSearch = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const searchRegex = new RegExp(safeSearch, 'i');
+                const searchNumber = Number(safeSearch);
+                
+                const products = await Product.find({ title: searchRegex });
+                const productIds: Types.ObjectId[] = products.map((product) => product._id as Types.ObjectId);
+                
+                const userOrders = await Order.find(userFilters).populate('products');
+                
+                let filteredOrders = userOrders.filter(order => {
+                    const matchesProduct = order.products.some(product => 
+                        productIds.some((id: Types.ObjectId) => id.equals(product._id))
+                    );
+                    const matchesOrderNumber = !Number.isNaN(searchNumber) && 
+                                             order.orderNumber === searchNumber;
+                    return matchesProduct || matchesOrderNumber;
+                });
+                
+                // Пагинация
+                const totalOrders = filteredOrders.length;
+                const totalPages = Math.ceil(totalOrders / limitNum);
+                filteredOrders = filteredOrders.slice(
+                    (pageNum - 1) * limitNum,
+                    pageNum * limitNum
+                );
+                
+                const sanitizedOrders = filteredOrders.map(sanitizeOrder);
+                
+                return res.status(200).json({
+                    orders: sanitizedOrders,
+                    pagination: {
+                        totalOrders,
+                        totalPages,
+                        currentPage: pageNum,
+                        pageSize: limitNum,
+                    },
+                });
+            }
+            
+            // Если нет поиска, просто возвращаем заказы пользователя
+            const userOrders = await Order.find(userFilters)
+                .populate(['customer', 'products'])
+                .skip((pageNum - 1) * limitNum)
+                .limit(limitNum);
+            
+            const totalOrders = await Order.countDocuments(userFilters);
+            const totalPages = Math.ceil(totalOrders / limitNum);
+            
+            const sanitizedOrders = userOrders.map(sanitizeOrder);
+            
+            return res.status(200).json({
+                orders: sanitizedOrders,
+                pagination: {
+                    totalOrders,
+                    totalPages,
+                    currentPage: pageNum,
+                    pageSize: limitNum,
+                },
+            });
+        }
+
         const pageNum = Math.max(1, parseInt(req.query.page as string) || 1);
         const limitNum = Math.min(10, Math.max(1, parseInt(req.query.limit as string) || 10));
         

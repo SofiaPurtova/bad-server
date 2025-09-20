@@ -6,6 +6,11 @@ import Order from '../models/order'
 import User, { IUser } from '../models/user'
 import xss from 'xss'
 
+enum Role {
+  Admin = 'admin',
+  User = 'user'
+}
+
 // Функция для санитизации пользователя
 const sanitizeUser = (user: any) => {
   const userObj = user.toObject ? user.toObject() : user
@@ -28,6 +33,29 @@ export const getCustomers = async (
     next: NextFunction
 ) => {
     try {
+        // КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Проверка прав доступа
+        const user = res.locals.user;
+        
+        // Если пользователь не админ, возвращаем ТОЛЬКО его данные
+        if (!user.roles.includes(Role.Admin)) {
+            const currentUser = await User.findById(user._id)
+                .select('-password')
+                .populate(['orders', 'lastOrder'])
+                .orFail(() => new NotFoundError('Пользователь не найден'));
+            
+            const sanitizedUser = sanitizeUser(currentUser);
+            
+            return res.status(200).json({
+                customers: [sanitizedUser],
+                pagination: {
+                    totalUsers: 1,
+                    totalPages: 1,
+                    currentPage: 1,
+                    pageSize: 1,
+                },
+            });
+        }
+
         const {
             sortField = 'createdAt',
             sortOrder = 'desc',
@@ -43,7 +71,7 @@ export const getCustomers = async (
         } = req.query
 
         const page = Math.max(1, parseInt(req.query.page as string) || 1);
-const limit = Math.min(10, Math.max(1, parseInt(req.query.limit as string) || 10));
+        const limit = Math.min(10, Math.max(1, parseInt(req.query.limit as string) || 10));
 
         const filters: FilterQuery<Partial<IUser>> = {}
 
@@ -184,26 +212,31 @@ export const getCustomerById = async (
     next: NextFunction
 ) => {
     try {
-        const { id } = req.params
+        const { id } = req.params;
+        const user = res.locals.user;
         
         // Валидация ID
         if (!Types.ObjectId.isValid(id)) {
             return next(new NotFoundError('Невалидный ID пользователя'))
         }
 
-        const user = await User.findById(id).populate([
+        if (!user.roles.includes(Role.Admin) && user._id.toString() !== id) {
+            return next(new NotFoundError('Пользователь не найден'));
+        }
+        
+        const foundUser = await User.findById(id).populate([
             'orders',
             'lastOrder',
-        ])
+        ]);
         
-        if (!user) {
-            return next(new NotFoundError('Пользователь не найден'))
+        if (!foundUser) {
+            return next(new NotFoundError('Пользователь не найден'));
         }
         
         // XSS защита при отправке
-        res.status(200).json(sanitizeUser(user))
+        res.status(200).json(sanitizeUser(foundUser));
     } catch (error) {
-        next(error)
+        next(error);
     }
 }
 
