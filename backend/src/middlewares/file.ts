@@ -50,6 +50,20 @@ const fileFilter = (
     file: Express.Multer.File,
     cb: FileFilterCallback
 ) => {
+    const allowedMimes = [
+        'image/png',
+        'image/jpg',
+        'image/jpeg',
+        'image/gif',
+        'image/svg+xml',
+    ];
+
+    // Проверка MIME type
+    if (!allowedMimes.includes(file.mimetype)) {
+        return cb(null, false);
+    }
+
+
     if (!types.includes(file.mimetype)) {
         return cb(null, false)
     }
@@ -62,6 +76,19 @@ const fileFilter = (
         return cb(null, false);
     }
 
+    // Проверка соответствия MIME type и расширения
+    const mimeToExt: { [key: string]: string[] } = {
+        'image/png': ['.png'],
+        'image/jpg': ['.jpg'],
+        'image/jpeg': ['.jpg', '.jpeg'],
+        'image/gif': ['.gif'],
+        'image/svg+xml': ['.svg'],
+    };
+
+    if (mimeToExt[file.mimetype] && !mimeToExt[file.mimetype].includes(ext)) {
+        return cb(null, false);
+    }
+
     return cb(null, true)
 }
 
@@ -70,6 +97,6 @@ export default multer({
     fileFilter,
     limits: {
         fileSize: 10 * 1024 * 1024, // 10MB максимум
-        files: 1 // не более 1 файла за раз
+        files: 1, // не более 1 файла за раз
     } 
 })
