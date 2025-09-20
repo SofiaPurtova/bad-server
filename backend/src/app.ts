@@ -9,6 +9,7 @@ import cors from 'cors'
 import 'dotenv/config'
 import express, { json, urlencoded, Request, Response, NextFunction } from 'express'
 import mongoose from 'mongoose'
+import ExpressMongoSanitize from 'express-mongo-sanitize'
 import path from 'path'
 import { DB_ADDRESS } from './config'
 import errorHandler from './middlewares/error-handler'
@@ -18,34 +19,34 @@ import routes from './routes'
 const { PORT = 3000 } = process.env
 const app = express()
 
+app.use(cookieParser())
+
+const limiter = rateLimit({
+    windowMs: 5 * 60 * 1000,
+    max: 50,
+    statusCode: 429,
+    message: 'The request limit is reached.',
+})
+app.use(limiter)
+
 // 1. Базовые middleware
-app.use(cors({
-  origin: /*['http://localhost', 'http://localhost:5173']*/ true,
-  credentials: true,
-  //methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  //allowedHeaders: ['Content-Type', 'X-CSRF-Token']
-}));
+app.use(
+    cors({
+        origin: ['http://localhost', 'http://localhost:5173'], // Разрешаем оба домена
+        credentials: true,
+    })
+)
+
 app.use(helmet());
-app.use(cookieParser());
+
 
 
 // 2. Парсинг тела запроса ДО CSRF
-app.use(urlencoded({ extended: true }))
-app.use(json())
+app.use(serveStatic(path.join(__dirname, 'public')))
+app.use(json({ limit: '10mb' }))
+app.use(urlencoded({ extended: true, limit: '10mb' }))
 
-// 3. Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: 'Too many requests from this IP',
-  standardHeaders: true,
-  legacyHeaders: false,
-  handler: (req, res) => {
-    res.status(429).json({
-      error: 'Слишком много запросов, попробуйте позже'
-    });
-  }
-});
+
 //app.use('/api/', limiter);
 
 const authLimiter = rateLimit({
@@ -89,8 +90,8 @@ app.get('/api/csrf-token', (req: Request, res: Response) => {
   res.json({ csrfToken: req.csrfToken() });
 });*/
 
-// 6. Static files
-app.use(serveStatic(path.join(__dirname, 'public')))
+app.options("*", cors())
+app.use(ExpressMongoSanitize())
 
 // 7. Routes
 app.use(routes)
