@@ -1,6 +1,7 @@
 import { Request, Express } from 'express'
 import multer, { FileFilterCallback } from 'multer'
 import path, { join } from 'path'
+import { v4 as uuidv4 } from 'uuid';
 
 type DestinationCallback = (error: Error | null, destination: string) => void
 type FileNameCallback = (error: Error | null, filename: string) => void
@@ -27,7 +28,7 @@ const storage = multer.diskStorage({
         file: Express.Multer.File,
         cb: FileNameCallback
     ) => {
-        const safeName = Date.now() + '-' + Math.round(Math.random() * 1E9) + path.extname(file.originalname);
+        const safeName = `${uuidv4()}${path.extname(file.originalname)}`;
         cb(null, safeName);
     },
 })
@@ -49,7 +50,22 @@ const fileFilter = (
         return cb(null, false)
     }
 
+    // Дополнительная проверка расширения файла
+    const ext = path.extname(file.originalname).toLowerCase();
+    const allowedExt = ['.png', '.jpg', '.jpeg', '.gif', '.svg'];
+    
+    if (!allowedExt.includes(ext)) {
+        return cb(null, false);
+    }
+
     return cb(null, true)
 }
 
-export default multer({ storage, fileFilter })
+export default multer({
+    storage,
+    fileFilter,
+    limits: {
+        fileSize: 10 * 1024 * 1024, // 10MB максимум
+        files: 1 // не более 1 файла за раз
+    } 
+})

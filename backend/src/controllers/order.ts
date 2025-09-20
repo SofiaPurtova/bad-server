@@ -21,8 +21,27 @@ const sanitizeOrder = (order: any) => {
 }
 
 const sanitizeSearch = (input: string): string => {
-  return input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return input
+  .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  .replace(/\\/g, '\\\\')
+  .replace(/'/g, '\\\'')
+  .replace(/"/g, '\\"')
 }
+
+// Новая функция для санитизации query параметров
+const sanitizeQueryParams = (query: any): any => {
+  const sanitized: any = {};
+  for (const [key, value] of Object.entries(query)) {
+    if (typeof value === 'string') {
+      sanitized[key] = sanitizeSearch(value);
+    } else {
+      sanitized[key] = value;
+    }
+  }
+  return sanitized;
+}
+
+
 
 // GET /orders
 export const getOrders = async (
@@ -31,8 +50,12 @@ export const getOrders = async (
     next: NextFunction
 ) => {
     try {
-        const page = Math.max(1, parseInt(req.query.page as string) || 1);
-        const limit = Math.min(10, Math.max(1, parseInt(req.query.limit as string) || 10));
+        const pageNum = Math.max(1, parseInt(req.query.page as string) || 1);
+        const limitNum = Math.min(10, Math.max(1, parseInt(req.query.limit as string) || 10));
+        
+        const { limit, page, search, ...otherParams } = req.query;
+        const sanitizedQuery = sanitizeQueryParams({ limit, page, search });
+        
         const {
             sortField = 'createdAt',
             sortOrder = 'desc',
@@ -41,8 +64,10 @@ export const getOrders = async (
             totalAmountTo,
             orderDateFrom,
             orderDateTo,
-            search,
         } = req.query
+
+        // Используем санитизированный search
+        const searchTerm = sanitizedQuery.search
 
         const filters: FilterQuery<Partial<IOrder>> = {}
 
@@ -108,8 +133,8 @@ export const getOrders = async (
         ]
 
         // Безопасный поиск
-        if (search && typeof search === 'string') {
-            const safeSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        if (searchTerm && typeof searchTerm === 'string') {
+            const safeSearch = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             const searchRegex = new RegExp(safeSearch, 'i')
             const searchNumber = Number(safeSearch)
 
@@ -135,8 +160,8 @@ export const getOrders = async (
 
         aggregatePipeline.push(
             { $sort: sort },
-            { $skip: (Number(page) - 1) * Number(limit) },
-            { $limit: Number(limit) },
+            { $skip: (Number(pageNum) - 1) * Number(limitNum) },
+            { $limit: Number(limitNum) },
             {
                 $group: {
                     _id: '$_id',
@@ -162,8 +187,8 @@ export const getOrders = async (
             pagination: {
                 totalOrders,
                 totalPages,
-                currentPage: Number(page),
-                pageSize: Number(limit),
+                currentPage: Number(pageNum),
+                pageSize: Number(limitNum),
             },
         })
     } catch (error) {
@@ -177,13 +202,17 @@ export const getOrdersCurrentUser = async (
     next: NextFunction
 ) => {
     try {
+        const { limit, page, search, ...otherParams } = req.query;
+        const sanitizedQuery = sanitizeQueryParams({ limit, page, search })
+
         const userId = res.locals.user._id
-        const { search } = req.query
-        const page = Math.max(1, parseInt(req.query.page as string) || 1);
-const limit = Math.min(10, Math.max(1, parseInt(req.query.limit as string) || 10));
+        const searchTerm = sanitizedQuery.search;
+
+        const pageNum = Math.max(1, parseInt(req.query.page as string) || 1);
+        const limitNum = Math.min(10, Math.max(1, parseInt(req.query.limit as string) || 10));
         const options = {
-            skip: (Number(page) - 1) * Number(limit),
-            limit: Number(limit),
+            skip: (Number(pageNum) - 1) * Number(limitNum),
+            limit: Number(limitNum),
         }
 
         const user = await User.findById(userId)
@@ -207,8 +236,8 @@ const limit = Math.min(10, Math.max(1, parseInt(req.query.limit as string) || 10
 
         let orders = user.orders as unknown as IOrder[]
 
-        if (search && typeof search === 'string') {
-            const safeSearch = sanitizeSearch(search)
+        if (searchTerm && typeof searchTerm === 'string') {
+            const safeSearch = sanitizeSearch(searchTerm)
             const searchRegex = new RegExp(safeSearch, 'i')
             const searchNumber = Number(safeSearch)
             const products = await Product.find({ title: searchRegex })
@@ -227,7 +256,7 @@ const limit = Math.min(10, Math.max(1, parseInt(req.query.limit as string) || 10
         }
 
         const totalOrders = orders.length
-        const totalPages = Math.ceil(totalOrders / Number(limit))
+        const totalPages = Math.ceil(totalOrders / Number(limitNum))
 
         orders = orders.slice(options.skip, options.skip + options.limit)
 
@@ -239,8 +268,8 @@ const limit = Math.min(10, Math.max(1, parseInt(req.query.limit as string) || 10
             pagination: {
                 totalOrders,
                 totalPages,
-                currentPage: Number(page),
-                pageSize: Number(limit),
+                currentPage: Number(pageNum),
+                pageSize: Number(limitNum),
             },
         })
     } catch (error) {

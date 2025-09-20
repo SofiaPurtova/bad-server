@@ -22,7 +22,8 @@ const app = express()
 app.use(cors({
   origin: ['http://localhost', 'http://localhost:5173'],
   credentials: true,
-  //allowedHeaders: ['Content-Type', 'X-CSRF-Token', 'Authorization']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'X-CSRF-Token', 'Authorization']
 }));
 app.use(helmet());
 app.use(cookieParser());

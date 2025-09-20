@@ -1,6 +1,7 @@
 {
   "dependencies": {
     "nodemon": "^3.1.10",
+    "uuid": "^13.0.0",
     "xss": "^1.0.15"
   }
 }
