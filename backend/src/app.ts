@@ -11,7 +11,7 @@ import express, { json, urlencoded, Request, Response, NextFunction } from 'expr
 import mongoose from 'mongoose'
 //import ExpressMongoSanitize from 'express-mongo-sanitize'
 import path from 'path'
-import { DB_ADDRESS } from './config'
+import { DB_ADDRESS, CORS_ORIGINS } from './config'
 import errorHandler from './middlewares/error-handler'
 import serveStatic from './middlewares/serverStatic'
 import routes from './routes'
@@ -28,13 +28,41 @@ const limiter = rateLimit({
     message: 'The request limit is reached.',
 })
 app.use(limiter)
+const DEFAULT_ORIGIN = 'http://localhost:5173'
+
+const allow = new Set(
+    (CORS_ORIGINS || '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+)
+if (!allow.has(DEFAULT_ORIGIN)) allow.add(DEFAULT_ORIGIN)
 
 app.use(
+    cors({
+        origin: (origin, cb) => {
+            if (!origin) return cb(null, true)
+            if (allow.has(origin)) return cb(null, true)
+            return cb(new Error('CORS'))
+        },
+        credentials: true,
+    })
+)
+
+app.use((req, res, next) => {
+    const o = (req.headers.origin as string | undefined) || DEFAULT_ORIGIN
+    if (allow.has(o) && !res.getHeader('Access-Control-Allow-Origin')) {
+        res.setHeader('Access-Control-Allow-Origin', o)
+    }
+    res.setHeader('Vary', 'Origin')
+    next()
+})
+/*app.use(
     cors({
         origin: ['http://localhost', 'http://localhost:5173'], // Разрешаем оба домена
         credentials: true,
     })
-)
+)*/
 
 app.use(serveStatic(path.join(__dirname, 'public')))
 app.use(json({ limit: '10mb' }))
@@ -70,7 +98,7 @@ app.get('/api/csrf-token', (req: Request, res: Response) => {
   res.json({ csrfToken: req.csrfToken() });
 });*/
 
-app.options("*", cors())
+//app.options("*", cors())
 //app.use(ExpressMongoSanitize())
 
 // 7. Routes
