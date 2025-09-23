@@ -29,7 +29,7 @@ const limiter = rateLimit({
 })
 app.use(limiter)
 
-aapp.use(
+app.use(
     cors({
         origin: ['http://localhost', 'http://localhost:5173'], // Разрешаем оба домена
         credentials: true,
