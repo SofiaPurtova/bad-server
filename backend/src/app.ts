@@ -72,7 +72,7 @@ app.get('/api/csrf-token', (req: Request, res: Response) => {
   res.json({ csrfToken: req.csrfToken() });
 });*/
 
-//app.options("*", cors())
+app.options("*", cors())
 //app.use(ExpressMongoSanitize())
 
 // 7. Routes
