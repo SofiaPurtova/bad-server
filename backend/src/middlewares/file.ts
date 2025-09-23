@@ -2,6 +2,7 @@ import { Request, Express } from 'express'
 import multer, { FileFilterCallback } from 'multer'
 import path, { join } from 'path'
 //import { v4 as uuidv4 } from 'uuid';
+import fs from 'fs'
 
 const generateSafeName = () => {
     return Date.now() + '-' + Math.round(Math.random() * 1E9) + '-' + Math.round(Math.random() * 1E9);
@@ -16,7 +17,7 @@ const storage = multer.diskStorage({
         _file: Express.Multer.File,
         cb: DestinationCallback
     ) => {
-        cb(
+        /*cb(
             null,
             join(
                 __dirname,
@@ -24,7 +25,17 @@ const storage = multer.diskStorage({
                     ? `../public/${process.env.UPLOAD_PATH_TEMP}`
                     : '../public'
             )
-        )
+        )*/
+       // Используем абсолютный путь для надежности в Docker
+        const uploadDir = process.env.UPLOAD_PATH_TEMP || 'temp';
+        const fullPath = path.join(process.cwd(), 'public', uploadDir);
+        
+        // Создаем директорию если не существует
+        if (!fs.existsSync(fullPath)) {
+            fs.mkdirSync(fullPath, { recursive: true });
+        }
+        
+        cb(null, fullPath);
     },
 
     filename: (

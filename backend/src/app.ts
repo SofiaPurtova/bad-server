@@ -31,7 +31,7 @@ app.use(limiter)
 
 app.use(
     cors({
-        origin: /*['http://localhost', 'http://localhost:5173'], // Разрешаем оба домена*/ true,
+        origin: ['http://localhost', 'http://localhost:5173'],
         credentials: true,
     })
 )
