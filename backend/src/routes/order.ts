@@ -23,7 +23,7 @@ orderRouter.get(
     roleGuardMiddleware(Role.Admin),
     getOrderByNumber
 )
-orderRouter.get('/me/:orderNumber', auth, roleGuardMiddleware(Role.Admin), getOrderCurrentUserByNumber)
+orderRouter.get('/me/:orderNumber', auth, getOrderCurrentUserByNumber)
 orderRouter.patch(
     '/:orderNumber',
     auth,

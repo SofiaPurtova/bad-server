@@ -15,5 +15,7 @@ customerRouter.get('/', auth, roleGuardMiddleware(Role.Admin), getCustomers)
 customerRouter.get('/:id', auth, roleGuardMiddleware(Role.Admin), getCustomerById)
 customerRouter.patch('/:id', auth, roleGuardMiddleware(Role.Admin), updateCustomer)
 customerRouter.delete('/:id', auth, roleGuardMiddleware(Role.Admin), deleteCustomer)
+customerRouter.get('/me', auth, getCustomerById)
+customerRouter.patch('/me', auth, updateCustomer)
 
 export default customerRouter

@@ -63,11 +63,6 @@ const fileFilter = (
         return cb(null, false);
     }
 
-
-    if (!types.includes(file.mimetype)) {
-        return cb(null, false)
-    }
-
     // Дополнительная проверка расширения файла
     const ext = path.extname(file.originalname).toLowerCase();
     const allowedExt = ['.png', '.jpg', '.jpeg', '.gif', '.svg'];
