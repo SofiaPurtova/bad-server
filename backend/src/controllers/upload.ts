@@ -15,9 +15,9 @@ export const uploadFile = async (
         return next(new BadRequestError('Файл не загружен'))
     }
     // ТЕСТ 13: Проверка минимального размера файла (больше 2KB)
-    /*if (req.file.size < 2 * 1024) { // 2KB минимум
+    if (req.file.size < 2 * 1024) { // 2KB минимум
         return next(new BadRequestError('Файл слишком маленький'));
-    }*/
+    }
 
     try {
         await sharp(req.file.path).metadata()

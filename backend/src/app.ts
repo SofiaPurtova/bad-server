@@ -33,6 +33,8 @@ app.use(
     cors({
         origin: ['http://localhost', 'http://localhost:5173'],
         credentials: true,
+        methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
     })
 )
 
@@ -70,7 +72,7 @@ app.get('/api/csrf-token', (req: Request, res: Response) => {
   res.json({ csrfToken: req.csrfToken() });
 });*/
 
-app.options("*", cors())
+//app.options("*", cors())
 //app.use(ExpressMongoSanitize())
 
 // 7. Routes
