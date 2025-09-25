@@ -28,7 +28,7 @@ const limiter = rateLimit({
     message: 'The request limit is reached.',
 })
 app.use(limiter)
-const DEFAULT_ORIGIN = 'http://localhost:5173'
+/*const DEFAULT_ORIGIN = 'http://localhost:5173'
 
 const allow = new Set(
     (CORS_ORIGINS || '')
@@ -56,13 +56,13 @@ app.use((req, res, next) => {
     }
     res.setHeader('Vary', 'Origin')
     next()
-})
-/*app.use(
+})*/
+app.use(
     cors({
-        origin: ['http://localhost', 'http://localhost:5173'], // Разрешаем оба домена
+        origin: ['http://localhost:5173'], // Разрешаем оба домена
         credentials: true,
     })
-)*/
+)
 
 app.use(serveStatic(path.join(__dirname, 'public')))
 app.use(json({ limit: '10mb' }))
